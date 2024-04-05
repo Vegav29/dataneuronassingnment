@@ -1,5 +1,4 @@
 from flask import Flask, request, jsonify
-from flask_asgi import FlaskASGI
 from sklearn.metrics.pairwise import cosine_similarity
 import tensorflow_hub as hub
 import re
@@ -11,7 +10,6 @@ embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder/4")
 
 # Initialize Flask app
 app = Flask(__name__)
-asgi_app = FlaskASGI(app)
 
 # Load NLTK resources
 import nltk
@@ -44,23 +42,26 @@ def semantic_similarity(sentence1, sentence2):
 # Define API endpoint
 @app.route('/api/similarity', methods=['POST'])
 def calculate_similarity():
-    # Get text inputs from request body
-    request_data = request.json
-    text1 = request_data.get('text1', '')
-    text2 = request_data.get('text2', '')
+    try:
+        # Get text inputs from request body
+        request_data = request.json
+        text1 = request_data.get('text1', '')
+        text2 = request_data.get('text2', '')
 
-    # Preprocess text inputs
-    text1 = preprocess_text(text1)
-    text2 = preprocess_text(text2)
+        # Preprocess text inputs
+        text1 = preprocess_text(text1)
+        text2 = preprocess_text(text2)
 
-    # Calculate similarity
-    similarity_score = semantic_similarity(text1, text2)
+        # Calculate similarity
+        similarity_score = semantic_similarity(text1, text2)
 
-    # Prepare response body
-    response_body = {'similarity_score': similarity_score}
+        # Prepare response body
+        response_body = {'similarity_score': similarity_score}
 
-    # Return JSON response
-    return jsonify(response_body)
+        # Return JSON response
+        return jsonify(response_body)
+    except Exception as e:
+        return jsonify({'error': 'An error occurred'}), 500
 
 # Define root endpoint
 @app.route('/', methods=['GET'])
@@ -68,5 +69,7 @@ def index():
     return "Welcome to the similarity calculation API!"
 
 if __name__ == '__main__':
-    # Run Flask app
-    asgi_app.run(debug=False)
+    # Run Flask app with Gunicorn server
+    # Use 0.0.0.0 to listen on all public IP addresses
+    app.run(host='0.0.0.0', port=5000)
+
