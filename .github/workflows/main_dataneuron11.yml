@@ -1,22 +1,71 @@
-# Use the official Python image from Docker Hub
-FROM python:3.8-slim
+name: Build and deploy Python app to Azure Web App 
 
-# Set the working directory in the container
-WORKDIR /app
+on:
+  push:
+    branches:
+      - deployment
+    paths:
+        - 'slack/**'
+        - 'requirements.txt'
+        - 'startup.txt'
+  workflow_dispatch:
 
-# Copy the current directory contents into the container at /app
-COPY . /app
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-# Install dependencies
-RUN pip install --no-cache-dir flask flask-asgi scikit-learn tensorflow-hub nltk
+    steps:
+      - uses: actions/checkout@v2
 
-# Download NLTK resources
-RUN python -m nltk.downloader punkt stopwords
+      - name: Set up Python version
+        uses: actions/setup-python@v1
+        with:
+          python-version: '3.8'
 
-# Expose the Flask port
-EXPOSE 5000
+      - name: Create and start virtual environment
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+      
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+        
+      # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
+      
+      - name: Upload artifact for deployment jobs
+        uses: actions/upload-artifact@v2
+        with:
+          name: python-app
+          path: |
+            . 
+            !venv/
 
-# Command to run the Flask application
-CMD ["python", "python.py"]
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v2
+        with:
+          name: python-app
+          path: .
+      
+      - name: Log in to Azure CLI using service principal
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          
+      - name: 'Deploy to Azure Web App'
+        uses: azure/webapps-deploy@v2
+        id: deploy-to-webapp
+        with:
+          app-name: 'slack-gpt-app'
+          slot-name: 'Production'
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_490AB47F40CF4E94847F3598F17D4071 }}
+
 
           
